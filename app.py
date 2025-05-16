@@ -207,6 +207,41 @@ with st.form(key="add_participant_form"):
         on_click=add_participant
     )
 
+# Function to edit participants
+def edit_participant(i):
+    """Edit a participant in the list."""
+    st.session_state.edit_index = i
+    # Pre-fill form with current values
+    participant = st.session_state.participants[i]
+    st.session_state.edit_name = participant["name"]
+    st.session_state.edit_tickets = participant["tickets"]
+
+def save_edit():
+    """Save edits to a participant."""
+    if st.session_state.edit_index is not None and st.session_state.edit_name and st.session_state.edit_tickets > 0:
+        # Update participant
+        st.session_state.participants[st.session_state.edit_index] = {
+            "name": st.session_state.edit_name,
+            "tickets": st.session_state.edit_tickets
+        }
+        # Reset edit state
+        st.session_state.edit_index = None
+        st.rerun()
+
+def delete_participant(i):
+    """Delete a participant from the list."""
+    if i < len(st.session_state.participants):
+        st.session_state.participants.pop(i)
+        st.rerun()
+
+# Initialize edit states if not already present
+if 'edit_index' not in st.session_state:
+    st.session_state.edit_index = None
+if 'edit_name' not in st.session_state:
+    st.session_state.edit_name = ""
+if 'edit_tickets' not in st.session_state:
+    st.session_state.edit_tickets = 1
+
 # Display participants table
 if st.session_state.participants:
     st.subheader(t("participants"))
@@ -220,16 +255,66 @@ if st.session_state.participants:
         df["probability"] = (df["tickets"] / total_tickets * 100).round(2)
         df["probability"] = df["probability"].astype(str) + "%"
     
+    # Add action column for edit and delete buttons
+    df["actions"] = None
+    
     # Rename columns for display
     df = df.rename(columns={
         "name": t("name_label"),
         "tickets": t("tickets_label"),
-        "probability": t("probability")
+        "probability": t("probability"),
+        "actions": ""  # Empty string for actions column header
     })
     
     # Show table
     st.dataframe(df)
     
+    # Add compact edit/delete controls
+    with st.expander(t("edit_participants"), expanded=False):
+        # Create small compact interface
+        participant_select = st.selectbox(
+            t("select_participant"),
+            options=range(len(st.session_state.participants)),
+            format_func=lambda i: st.session_state.participants[i]["name"]
+        )
+        
+        # Put edit and delete buttons side by side
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✏️ " + t("edit_button"), key="edit_btn"):
+                edit_participant(participant_select)
+        
+        with col2:
+            if st.button("🗑️ " + t("delete_button"), key="delete_btn"):
+                delete_participant(participant_select)
+    
+    # Edit form (only shown when editing)
+    if st.session_state.edit_index is not None:
+        st.subheader(t("edit_participant"))
+        
+        with st.form(key="edit_participant_form"):
+            st.text_input(t("name_label"), key="edit_name")
+            st.number_input(
+                t("tickets_label"), 
+                min_value=1, 
+                max_value=1000, 
+                step=1,
+                key="edit_tickets"
+            )
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                submit = st.form_submit_button(t("save"))
+                if submit:
+                    save_edit()
+            
+            with col2:
+                cancel = st.form_submit_button(t("cancel"))
+                if cancel:
+                    st.session_state.edit_index = None
+                    st.rerun()
+    
+    # Action buttons
     col1, col2, col3 = st.columns(3)
     
     with col1:
